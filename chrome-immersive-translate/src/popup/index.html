@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>沉浸式翻译</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1>沉浸式翻译</h1>
+      <a href="#" id="open-options" class="link">设置</a>
+    </header>
+
+    <section class="toggles">
+      <label class="toggle">
+        <input type="checkbox" id="online-toggle" />
+        <span>本页在线翻译</span>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" id="offline-toggle" />
+        <span>本页离线预译</span>
+      </label>
+      <p class="hint">默认关闭；开启后才会请求 API 并消耗 token。</p>
+    </section>
+
+    <section class="manual">
+      <label for="platform">翻译平台</label>
+      <select id="platform">
+        <option value="gemini">Gemini</option>
+        <option value="grok">Grok (xAI)</option>
+        <option value="openai">OpenAI</option>
+      </select>
+      <p class="model-line">当前模型：<code id="model-id">—</code></p>
+
+      <label for="input">手动翻译</label>
+      <textarea id="input" rows="5" placeholder="输入要翻译的文本…"></textarea>
+      <button type="button" id="translate-btn" class="primary">翻译</button>
+
+      <div class="result-block">
+        <div class="result-meta">
+          所用模型：<code id="result-model">—</code>
+          <span id="result-cache" class="badge hidden">缓存</span>
+        </div>
+        <div id="result" class="result" aria-live="polite"></div>
+        <p id="fallback-note" class="fallback hidden"></p>
+        <p id="error" class="error hidden"></p>
+      </div>
+    </section>
+
+    <script type="module" src="./popup.ts"></script>
+  </body>
+</html>

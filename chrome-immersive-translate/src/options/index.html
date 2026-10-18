@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>沉浸式翻译 — 设置</title>
+    <link rel="stylesheet" href="./options.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <h1>沉浸式翻译</h1>
+        <p>设置 API Key、模型、缓存与用量看板</p>
+      </header>
+
+      <section class="card" id="platforms">
+        <h2>平台与 API Key</h2>
+        <p class="note">密钥仅保存在本机 Chrome 存储，翻译请求由扩展后台发出，不会进入网页上下文。</p>
+
+        <div class="platform" data-platform="gemini">
+          <h3>Gemini <span class="default-model">默认 gemini-2.5-flash</span></h3>
+          <label>API Key<input type="password" data-field="apiKey" autocomplete="off" /></label>
+          <label>模型 ID<input type="text" data-field="modelId" /></label>
+          <label class="check"><input type="checkbox" data-field="enabled" checked /> 启用</label>
+        </div>
+
+        <div class="platform" data-platform="grok">
+          <h3>Grok (xAI) <span class="default-model">默认 grok-2-latest</span></h3>
+          <label>API Key<input type="password" data-field="apiKey" autocomplete="off" /></label>
+          <label>模型 ID<input type="text" data-field="modelId" /></label>
+          <label class="check"><input type="checkbox" data-field="enabled" checked /> 启用</label>
+        </div>
+
+        <div class="platform" data-platform="openai">
+          <h3>OpenAI <span class="default-model">默认 gpt-4o</span></h3>
+          <label>API Key<input type="password" data-field="apiKey" autocomplete="off" /></label>
+          <label>模型 ID<input type="text" data-field="modelId" /></label>
+          <label class="check"><input type="checkbox" data-field="enabled" checked /> 启用</label>
+        </div>
+
+        <p class="note">路由优先级：Gemini → Grok → OpenAI（未配置的平台自动跳过；失败时提示并降级）。</p>
+      </section>
+
+      <section class="card">
+        <h2>缓存</h2>
+        <label>
+          上限（MB）
+          <input type="number" id="cache-limit" min="1" max="500" step="1" />
+        </label>
+        <p id="cache-stats" class="stats">—</p>
+        <button type="button" id="clear-cache" class="secondary">清空缓存</button>
+      </section>
+
+      <section class="card">
+        <h2>用量看板</h2>
+        <p class="note">按本插件实际发出的请求统计；无硬上限、无熔断。失败不计成功用量；降级成功记在最终成功的平台。</p>
+        <div id="usage-boards" class="boards"></div>
+        <h3>近日趋势</h3>
+        <div id="usage-daily" class="daily"></div>
+      </section>
+
+      <section class="card">
+        <h2>关于</h2>
+        <p>版本 <strong>1.0.0</strong> · Manifest V3 · 目标语言：简体中文</p>
+        <p class="note">v1 不含 Cursor / PDF / 视频 / EPUB。请使用开发者模式加载已解压扩展。</p>
+      </section>
+
+      <div class="actions">
+        <button type="button" id="save" class="primary">保存设置</button>
+        <span id="save-status" class="status" aria-live="polite"></span>
+      </div>
+    </div>
+    <script type="module" src="./options.ts"></script>
+  </body>
+</html>

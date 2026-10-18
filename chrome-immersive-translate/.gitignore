@@ -1,0 +1,9 @@
+node_modules/
+*.map
+.DS_Store
+*.log
+.env
+.env.*
+.chrome-profile-selftest/
+.chrome-profile*/
+*.tsbuildinfo

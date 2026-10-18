@@ -1,0 +1,21 @@
+{
+  "name": "chrome-immersive-translate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "沉浸式翻译 — Chrome MV3 网页双语对照 + 弹窗手动翻译",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/build.mjs",
+    "build": "tsc --noEmit && node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "pack": "node scripts/pack.mjs",
+    "selftest": "node scripts/selftest-cdp.mjs"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "playwright-core": "^1.64.1",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "ws": "^8.22.0"
+  }
+}
