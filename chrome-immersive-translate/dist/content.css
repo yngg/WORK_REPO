@@ -1,0 +1,85 @@
+.imt-translation {
+  display: block;
+  margin: 0.35em 0 0.85em;
+  padding: 0.15em 0 0.15em 0.65em;
+  border-left: 2px solid rgba(30, 90, 140, 0.35);
+  color: #3a4a5a;
+  font-size: 0.95em;
+  line-height: 1.65;
+  font-weight: 400;
+  opacity: 0.92;
+  animation: imt-fade-in 0.28s ease-out;
+}
+
+.imt-placeholder {
+  display: block;
+  margin: 0.25em 0 0.75em;
+  padding: 0.2em 0.5em;
+  color: #8a6a2a;
+  background: rgba(255, 220, 120, 0.18);
+  font-size: 0.85em;
+  border-radius: 2px;
+  animation: imt-fade-in 0.2s ease-out;
+}
+
+.imt-toast-host {
+  position: fixed;
+  z-index: 2147483646;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(360px, 90vw);
+  pointer-events: none;
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
+.imt-toast {
+  pointer-events: auto;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  background: #1e2936;
+  color: #f5f7fa;
+  animation: imt-slide-in 0.25s ease-out;
+}
+
+.imt-toast--error {
+  background: #7a2430;
+}
+
+.imt-toast--warn {
+  background: #6a4a12;
+}
+
+@keyframes imt-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 0.92;
+    transform: none;
+  }
+}
+
+@keyframes imt-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .imt-translation {
+    color: #b8c4d0;
+    border-left-color: rgba(120, 170, 220, 0.4);
+  }
+}
