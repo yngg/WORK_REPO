@@ -69,6 +69,7 @@ export async function summarizeUsage(days = 14): Promise<UsageSummary> {
   const recent = records.filter((r) => r.ts >= cutoff);
 
   const byPlatform = {
+    local: emptyPlat(),
     gemini: emptyPlat(),
     cursor: emptyPlat(),
     grok: emptyPlat(),

@@ -1,13 +1,14 @@
-# 沉浸式翻译（Chrome MV3）v1
+# 沉浸式翻译（Chrome MV3）v1.1
 
-网页段落**双语对照**（原文下方显示中文译文）+ 工具栏**弹窗手动翻译**。支持 Gemini / Cursor（实验）/ Grok / OpenAI；密钥或 OAuth 仅存本机。
+网页段落**双语对照**（原文下方显示中文译文）+ 工具栏**弹窗手动翻译**。支持 **本地 Ollama** / Gemini / Cursor（实验）/ Grok / OpenAI；密钥或 OAuth 仅存本机。
 
 ## 功能概览
 
+- **本地模型 (Ollama)**：默认优先，免云端配额（见 [docs/local-translate.md](./docs/local-translate.md)）
 - 本页在线翻译（默认关闭，显式开启才请求）
 - 本页离线预译 + 断网缓存/占位
-- 弹窗手动翻译（默认 Gemini，可切换平台；始终展示所用模型 ID）
-- 失败自动降级：Gemini → Cursor → Grok → OpenAI
+- 弹窗手动翻译（可切换平台；始终展示所用模型 ID）
+- 失败自动降级：Local → Gemini → Cursor → Grok → OpenAI（可关「优先本地」）
 - 本机段落缓存（默认 50MB，LRU）
 - 用量看板（按平台/模型统计）
 
@@ -35,7 +36,17 @@ npm run build
 - 可加载目录：`dist/`
 - 发布压缩包：`dist/immersive-translate-v1.zip`（根目录亦有一份）
 
-## 获取 API Key
+## 本地模型（推荐先试）
+
+```bash
+# 安装 https://ollama.com 后：
+ollama pull qwen2.5:7b    # Mac M2 · 16GB 推荐
+# ollama pull qwen2.5:14b # Mac M5 · 24GB 提质；16GB 可选但偏紧
+```
+
+扩展设置 → 启用「本地模型」→「优先本地」→ 刷新模型列表。完整说明见 store：`docs/local-translate.md`。
+
+## 获取 API Key（云端降级）
 
 | 平台 | 控制台 | 默认模型（可改） |
 |------|--------|------------------|

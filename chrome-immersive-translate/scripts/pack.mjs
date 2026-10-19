@@ -6,7 +6,7 @@ import { execSync } from "node:child_process";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 const dist = resolve(root, "dist");
-const zipName = "immersive-translate-v1.zip";
+const zipName = process.env.ZIP_NAME || "immersive-translate-v1.zip";
 const zipPath = resolve(dist, zipName);
 const rootZip = resolve(root, zipName);
 
@@ -18,7 +18,7 @@ if (!existsSync(resolve(dist, "manifest.json"))) {
 if (existsSync(zipPath)) rmSync(zipPath);
 if (existsSync(rootZip)) rmSync(rootZip);
 
-execSync(`cd "${dist}" && zip -r "${zipName}" . -x "*.map" -x "${zipName}"`, {
+execSync(`cd "${dist}" && zip -r "${zipName}" . -x "*.map" -x "*.zip"`, {
   stdio: "inherit",
 });
 cpSync(zipPath, rootZip);

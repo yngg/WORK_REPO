@@ -55,6 +55,26 @@ body {
   font-size: 17px;
 }
 
+.ram-hints {
+  margin: 8px 0 0;
+  padding-left: 1.2em;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.ram-hints li {
+  margin-bottom: 4px;
+}
+
+.hidden-field {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
 .card h3 {
   margin: 16px 0 8px;
   font-size: 14px;

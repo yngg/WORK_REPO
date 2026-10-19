@@ -1,8 +1,9 @@
 import { getSettings } from "../shared/storage";
 import {
+  CLOUD_PLATFORM_ORDER,
   MAX_CONCURRENCY,
+  MAX_CONCURRENCY_LOCAL,
   PLATFORM_LABELS,
-  PLATFORM_ORDER,
   TARGET_LANG,
   type Platform,
   type TranslateMode,
@@ -23,6 +24,7 @@ import { recordFailure, recordSuccess } from "./usage";
 
 const inflight = new Map<string, Promise<TranslateResult>>();
 let activeCount = 0;
+let effectiveMaxConcurrency = MAX_CONCURRENCY;
 const waitQueue: Array<() => void> = [];
 
 /** Per-platform retries before falling through to the next provider. */
@@ -33,7 +35,7 @@ const SUSTAINED_429_FALLBACK = 3;
 async function acquireSlot(signal?: AbortSignal): Promise<void> {
   await waitForCooldown(signal);
   if (signal?.aborted) return;
-  if (activeCount < MAX_CONCURRENCY) {
+  if (activeCount < effectiveMaxConcurrency) {
     activeCount += 1;
     return;
   }
@@ -48,14 +50,30 @@ function releaseSlot(): void {
   if (next) next();
 }
 
+/** Routing order: optional Local first, then cloud chain. */
+async function routingOrder(preferred?: Platform): Promise<Platform[]> {
+  const settings = await getSettings();
+  const cloud = [...CLOUD_PLATFORM_ORDER];
+  const base: Platform[] =
+    settings.preferLocal !== false
+      ? ["local", ...cloud]
+      : [...cloud, "local"];
+
+  if (preferred) {
+    return [preferred, ...base.filter((p) => p !== preferred)];
+  }
+  return base;
+}
+
 async function configuredPlatforms(preferred?: Platform): Promise<Platform[]> {
-  const all = preferred
-    ? [preferred, ...PLATFORM_ORDER.filter((p) => p !== preferred)]
-    : [...PLATFORM_ORDER];
+  const all = await routingOrder(preferred);
   const ready: Platform[] = [];
   for (const p of all) {
     if (await isPlatformReady(p)) ready.push(p);
   }
+  // Local LLMs: serialize (concurrency 1). Cloud-only: keep MAX_CONCURRENCY.
+  effectiveMaxConcurrency =
+    ready[0] === "local" ? MAX_CONCURRENCY_LOCAL : MAX_CONCURRENCY;
   return ready;
 }
 
@@ -267,7 +285,9 @@ export async function translateBatch(
 ): Promise<Array<{ id: string; result: TranslateResult }>> {
   const out: Array<{ id: string; result: TranslateResult }> = [];
   const queue = [...items];
-  const workerCount = Math.min(MAX_CONCURRENCY, Math.max(1, queue.length));
+  // Probe routing so effectiveMaxConcurrency is set (local → 1)
+  await configuredPlatforms();
+  const workerCount = Math.min(effectiveMaxConcurrency, Math.max(1, queue.length));
   let stopAll = false;
 
   const workers = Array.from({ length: workerCount }, async () => {

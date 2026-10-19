@@ -10,6 +10,27 @@ export interface PlatformMeta {
 }
 
 export const PLATFORM_META: Record<Platform, PlatformMeta> = {
+  local: {
+    supportsOAuth: false,
+    oauthNoteZh: "本地模型无需云端登录；由本机 Ollama（或兼容服务）提供推理。",
+    apiKeyNoteZh:
+      "默认连接 http://127.0.0.1:11434。Mac M2·16GB 推荐 qwen2.5:7b；Mac M5·24GB 可用 qwen2.5:14b 提质。首次 pull 体积较大，请预留磁盘与内存。",
+    recommendedModelIds: ["qwen2.5:14b", "qwen2.5:7b", "gemma2:9b", "llama3.2:3b"],
+    fallbackModels: [
+      {
+        id: "qwen2.5:14b",
+        displayName: "qwen2.5:14b（推荐 · 24GB）",
+        recommended: true,
+      },
+      {
+        id: "qwen2.5:7b",
+        displayName: "qwen2.5:7b（推荐 · 16GB / 更快）",
+        recommended: true,
+      },
+      { id: "gemma2:9b", displayName: "gemma2:9b（备选）" },
+      { id: "llama3.2:3b", displayName: "llama3.2:3b（更快/较弱）" },
+    ],
+  },
   gemini: {
     supportsOAuth: true,
     oauthNoteZh:
@@ -65,19 +86,55 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
   },
 };
 
-export function markRecommended(models: ModelInfo[], platform: Platform): ModelInfo[] {
-  const rec = new Set(PLATFORM_META[platform].recommendedModelIds);
-  return models.map((m) => ({
-    ...m,
-    recommended: m.recommended || rec.has(m.id) || [...rec].some((r) => m.id.includes(r)),
-  }));
+/** Annotate local Ollama model labels for Mac RAM tiers. */
+export function annotateLocalModelLabel(id: string, displayName?: string): string {
+  const base = displayName || id;
+  const lower = id.toLowerCase();
+  if (/qwen2\.5:14b/.test(lower)) return `${id}（推荐 · 24GB）`;
+  if (/qwen2\.5:7b/.test(lower)) return `${id}（推荐 · 16GB / 更快）`;
+  if (/gemma2:9b/.test(lower)) return `${id}（备选）`;
+  if (/llama3\.2:3b/.test(lower)) return `${id}（更快/较弱）`;
+  if (base !== id) return base;
+  return id;
 }
 
+export function markRecommended(models: ModelInfo[], platform: Platform): ModelInfo[] {
+  const rec = new Set(PLATFORM_META[platform].recommendedModelIds);
+  return models.map((m) => {
+    const recommended =
+      m.recommended || rec.has(m.id) || [...rec].some((r) => m.id.includes(r) || r.includes(m.id));
+    if (platform === "local") {
+      return {
+        ...m,
+        displayName: annotateLocalModelLabel(m.id, m.displayName),
+        recommended: recommended || /qwen2\.5:(7b|14b)/i.test(m.id),
+      };
+    }
+    return { ...m, recommended };
+  });
+}
+
+/**
+ * Prefer current selection if still present.
+ * Local: if both pulled, prefer qwen2.5:14b (24GB quality), else qwen2.5:7b (16GB default).
+ */
 export function pickRecommendedId(models: ModelInfo[], platform: Platform, current?: string): string {
   if (current && models.some((m) => m.id === current)) return current;
+
+  if (platform === "local") {
+    const fourteen = models.find((m) => /qwen2\.5:14b/i.test(m.id));
+    if (fourteen) return fourteen.id;
+    const seven = models.find((m) => /qwen2\.5:7b/i.test(m.id));
+    if (seven) return seven.id;
+  }
+
   const rec = models.find((m) => m.recommended);
   if (rec) return rec.id;
-  const fallback = PLATFORM_META[platform].recommendedModelIds[0];
+  const fallback = PLATFORM_META[platform].recommendedModelIds.find((id) =>
+    models.some((m) => m.id === id)
+  );
   if (fallback) return fallback;
+  const metaFallback = PLATFORM_META[platform].recommendedModelIds[0];
+  if (metaFallback) return metaFallback;
   return models[0]?.id ?? "";
 }

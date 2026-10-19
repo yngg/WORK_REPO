@@ -21,12 +21,13 @@
         <input type="checkbox" id="offline-toggle" />
         <span>本页离线预译</span>
       </label>
-      <p class="hint">默认关闭；开启后才会请求 API 并消耗 token。</p>
+      <p class="hint">默认关闭；开启后才会请求（本地 Ollama 或云端 API）。</p>
     </section>
 
     <section class="manual">
       <label for="platform">翻译平台</label>
       <select id="platform">
+        <option value="local">本地模型 (Ollama)</option>
         <option value="gemini">Gemini</option>
         <option value="cursor">Cursor</option>
         <option value="grok">Grok (xAI)</option>
