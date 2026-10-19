@@ -11,6 +11,23 @@
   animation: imt-fade-in 0.28s ease-out;
 }
 
+.imt-translation-text {
+  display: inline;
+}
+
+.imt-model-footnote {
+  display: inline;
+  margin-left: 0.35em;
+  font-size: 0.68em;
+  font-weight: 400;
+  color: #8a97a6;
+  vertical-align: super;
+  line-height: 1;
+  letter-spacing: 0;
+  opacity: 0.85;
+  user-select: none;
+}
+
 .imt-placeholder {
   display: block;
   margin: 0.25em 0 0.75em;
@@ -81,5 +98,9 @@
   .imt-translation {
     color: #b8c4d0;
     border-left-color: rgba(120, 170, 220, 0.4);
+  }
+
+  .imt-model-footnote {
+    color: #7a8898;
   }
 }

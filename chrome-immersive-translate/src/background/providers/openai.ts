@@ -1,5 +1,5 @@
 import type { ProviderCallArgs, ProviderCallResult } from "./types";
-import { ProviderError, TRANSLATE_SYSTEM } from "./types";
+import { ProviderError, TRANSLATE_SYSTEM, TRANSLATE_USER_PREFIX } from "./types";
 
 export async function translateOpenAI(args: ProviderCallArgs): Promise<ProviderCallResult> {
   const { apiKey, modelId, text, signal } = args;
@@ -17,7 +17,7 @@ export async function translateOpenAI(args: ProviderCallArgs): Promise<ProviderC
       temperature: 0.2,
       messages: [
         { role: "system", content: TRANSLATE_SYSTEM },
-        { role: "user", content: text },
+        { role: "user", content: TRANSLATE_USER_PREFIX + text },
       ],
     }),
   });

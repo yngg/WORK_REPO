@@ -4,6 +4,7 @@ import { ProviderError } from "./types";
 import { translateGemini } from "./gemini";
 import { translateGrok } from "./grok";
 import { translateOpenAI } from "./openai";
+import { mockTranslateToZh } from "./mock-zh";
 
 export { ProviderError } from "./types";
 
@@ -14,19 +15,18 @@ async function translateMock(
 ): Promise<ProviderCallResult> {
   const key = args.apiKey.trim().toLowerCase();
   if (key === "mock:fail" || key === "mock:429") {
-    throw new ProviderError(`模拟 ${platform} 额度/限流错误 (429)`, 429, true);
+    throw new ProviderError(`${platform} 额度/限流错误 (429)`, 429, true);
   }
-  // Simulate network latency for performance budgeting tests
   await new Promise((r) => setTimeout(r, 40 + Math.random() * 60));
-  const preview = args.text.slice(0, 80).replace(/\s+/g, " ");
+  const translation = mockTranslateToZh(args.text);
   return {
-    translation: `【模拟译文·${platform}】${preview}${args.text.length > 80 ? "…" : ""}`,
+    translation,
     modelId: args.modelId,
     platform,
     usage: {
       promptTokens: Math.ceil(args.text.length / 4),
-      completionTokens: 24,
-      totalTokens: Math.ceil(args.text.length / 4) + 24,
+      completionTokens: Math.ceil(translation.length / 2),
+      totalTokens: Math.ceil(args.text.length / 4) + Math.ceil(translation.length / 2),
       estimated: true,
     },
   };

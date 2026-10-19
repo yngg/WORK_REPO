@@ -1,5 +1,5 @@
 import type { ProviderCallArgs, ProviderCallResult } from "./types";
-import { ProviderError, TRANSLATE_SYSTEM } from "./types";
+import { ProviderError, TRANSLATE_SYSTEM, TRANSLATE_USER_PREFIX } from "./types";
 
 export async function translateGemini(args: ProviderCallArgs): Promise<ProviderCallResult> {
   const { apiKey, modelId, text, signal } = args;
@@ -11,7 +11,7 @@ export async function translateGemini(args: ProviderCallArgs): Promise<ProviderC
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: TRANSLATE_SYSTEM }] },
-      contents: [{ role: "user", parts: [{ text }] }],
+      contents: [{ role: "user", parts: [{ text: TRANSLATE_USER_PREFIX + text }] }],
       generationConfig: { temperature: 0.2 },
     }),
   });

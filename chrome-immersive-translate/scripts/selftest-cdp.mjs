@@ -133,8 +133,24 @@ async function main() {
     const nav = document.querySelector("nav");
     return nav?.nextElementSibling?.hasAttribute?.("data-imt-translation") === true;
   });
-  record("F2", onCount >= 2 && !navHit, `injected=${onCount}, firstMs=${firstMs}`);
+  const zhCheck = await page.evaluate(() => {
+    const nodes = [...document.querySelectorAll("[data-imt-translation]")];
+    const texts = nodes.map((n) => n.querySelector(".imt-translation-text")?.textContent || n.textContent || "");
+    const footnotes = nodes.map((n) => n.querySelector(".imt-model-footnote")?.textContent || "");
+    const joined = texts.join("\n");
+    const hasZh = /[\u4e00-\u9fff]/.test(joined);
+    const hasMockLabel = /模拟译文/.test(joined) || nodes.some((n) => /模拟译文/.test(n.textContent || ""));
+    const allFootnotes = footnotes.every((f) => !!f);
+    return { hasZh, hasMockLabel, allFootnotes, sample: texts[0]?.slice(0, 80), footnote: footnotes[0] };
+  });
+  record(
+    "F2",
+    onCount >= 2 && !navHit && zhCheck.hasZh && !zhCheck.hasMockLabel && zhCheck.allFootnotes,
+    `injected=${onCount}, firstMs=${firstMs}, zh=${zhCheck.hasZh}, mockLabel=${zhCheck.hasMockLabel}, footnote=${zhCheck.footnote}, sample=${zhCheck.sample}`
+  );
   record("P1", firstMs < 3000, `firstVisibleMs=${firstMs}`);
+  record("ZH", zhCheck.hasZh && !zhCheck.hasMockLabel, `sample=${zhCheck.sample}`);
+  record("FOOTNOTE", zhCheck.allFootnotes, `model=${zhCheck.footnote}`);
   await page.screenshot({ path: resolve(mediaDir, "f2-bilingual.png"), fullPage: true });
 
   const usageBefore = await hub.evaluate(async () => {
@@ -160,10 +176,18 @@ async function main() {
       preferredPlatform: "gemini",
     },
   });
+  const manualZh = /[\u4e00-\u9fff]/.test(manual?.data?.translation || "");
+  const manualNoLabel = !/模拟译文/.test(manual?.data?.translation || "");
   record(
     "F5",
-    !!(manual?.ok && manual?.data?.modelId === "gemini-2.5-flash" && manual?.data?.translation),
-    `model=${manual?.data?.modelId}`
+    !!(
+      manual?.ok &&
+      manual?.data?.modelId === "gemini-2.5-flash" &&
+      manual?.data?.translation &&
+      manualZh &&
+      manualNoLabel
+    ),
+    `model=${manual?.data?.modelId}, zh=${manualZh}, text=${String(manual?.data?.translation || "").slice(0, 60)}`
   );
 
   await extMsg(hub, {

@@ -2,6 +2,31 @@ const ATTR_TRANS = "data-imt-translation";
 const ATTR_PLACE = "data-imt-placeholder";
 const ATTR_MODEL = "data-imt-model";
 
+function fillTranslationNode(
+  node: HTMLElement,
+  translation: string,
+  meta?: { modelId?: string; platform?: string; fromCache?: boolean }
+): void {
+  node.replaceChildren();
+  const text = document.createElement("span");
+  text.className = "imt-translation-text";
+  text.textContent = translation;
+  node.appendChild(text);
+
+  if (meta?.modelId) {
+    node.setAttribute(ATTR_MODEL, meta.modelId);
+    const mark = document.createElement("sup");
+    mark.className = "imt-model-footnote";
+    mark.textContent = meta.modelId;
+    mark.title = `模型 ${meta.modelId}${meta.fromCache ? "（缓存）" : ""}${
+      meta.platform ? ` · ${meta.platform}` : ""
+    }`;
+    node.appendChild(mark);
+  } else {
+    node.removeAttribute(ATTR_MODEL);
+  }
+}
+
 export function insertTranslation(
   el: HTMLElement,
   translation: string,
@@ -10,17 +35,13 @@ export function insertTranslation(
   removePlaceholder(el);
   let node = el.nextElementSibling as HTMLElement | null;
   if (node?.hasAttribute(ATTR_TRANS)) {
-    node.textContent = translation;
+    fillTranslationNode(node, translation, meta);
   } else {
     node = document.createElement("div");
     node.setAttribute(ATTR_TRANS, "1");
     node.className = "imt-translation";
-    node.textContent = translation;
+    fillTranslationNode(node, translation, meta);
     el.insertAdjacentElement("afterend", node);
-  }
-  if (meta?.modelId) {
-    node.setAttribute(ATTR_MODEL, meta.modelId);
-    node.title = `模型: ${meta.modelId}${meta.fromCache ? "（缓存）" : ""}${meta.platform ? ` · ${meta.platform}` : ""}`;
   }
 }
 

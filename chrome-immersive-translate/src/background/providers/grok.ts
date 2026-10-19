@@ -1,5 +1,5 @@
 import type { ProviderCallArgs, ProviderCallResult } from "./types";
-import { ProviderError, TRANSLATE_SYSTEM } from "./types";
+import { ProviderError, TRANSLATE_SYSTEM, TRANSLATE_USER_PREFIX } from "./types";
 
 /** xAI Grok OpenAI-compatible chat completions API */
 export async function translateGrok(args: ProviderCallArgs): Promise<ProviderCallResult> {
@@ -18,7 +18,7 @@ export async function translateGrok(args: ProviderCallArgs): Promise<ProviderCal
       temperature: 0.2,
       messages: [
         { role: "system", content: TRANSLATE_SYSTEM },
-        { role: "user", content: text },
+        { role: "user", content: TRANSLATE_USER_PREFIX + text },
       ],
     }),
   });

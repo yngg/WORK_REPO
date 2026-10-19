@@ -14,7 +14,6 @@ const modelIdEl = document.getElementById("model-id") as HTMLElement;
 const input = document.getElementById("input") as HTMLTextAreaElement;
 const translateBtn = document.getElementById("translate-btn") as HTMLButtonElement;
 const resultEl = document.getElementById("result") as HTMLElement;
-const resultModel = document.getElementById("result-model") as HTMLElement;
 const resultCache = document.getElementById("result-cache") as HTMLElement;
 const fallbackNote = document.getElementById("fallback-note") as HTMLElement;
 const errorEl = document.getElementById("error") as HTMLElement;
@@ -62,6 +61,21 @@ function updateModelLabel(): void {
   modelIdEl.textContent = id;
 }
 
+function renderResult(translation: string, modelId?: string): void {
+  resultEl.replaceChildren();
+  const text = document.createElement("span");
+  text.className = "result-text";
+  text.textContent = translation;
+  resultEl.appendChild(text);
+  if (modelId) {
+    const mark = document.createElement("sup");
+    mark.className = "result-model-footnote";
+    mark.textContent = modelId;
+    mark.title = `模型 ${modelId}`;
+    resultEl.appendChild(mark);
+  }
+}
+
 async function setTabFlags(): Promise<void> {
   if (tabId == null) return;
   await sendMessage({
@@ -87,8 +101,7 @@ async function runTranslate(): Promise<void> {
 
   translateBtn.disabled = true;
   translateBtn.textContent = "翻译中…";
-  resultEl.textContent = "";
-  resultModel.textContent = "—";
+  resultEl.replaceChildren();
 
   try {
     const preferredPlatform = platformSelect.value as Platform;
@@ -109,12 +122,11 @@ async function runTranslate(): Promise<void> {
         fallbackNote.textContent = data.fallbackNote;
         fallbackNote.classList.remove("hidden");
       }
-      resultModel.textContent = data?.modelId ?? modelIdEl.textContent ?? "—";
+      if (data?.modelId) renderResult("", data.modelId);
       return;
     }
 
-    resultEl.textContent = data.translation ?? "";
-    resultModel.textContent = data.modelId ?? "—";
+    renderResult(data.translation ?? "", data.modelId);
     if (data.fromCache) resultCache.classList.remove("hidden");
     if (data.fallbackNote) {
       fallbackNote.textContent = data.fallbackNote;
