@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>沉浸式翻译 — 设置</title>
+    <link rel="stylesheet" href="./options.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <h1>沉浸式翻译</h1>
+        <p>账户接入、模型选择、缓存与用量看板</p>
+      </header>
+
+      <section class="card">
+        <h2>路由说明</h2>
+        <p class="note">
+          无余额信息时优先级：<strong>Gemini → Cursor → Grok → OpenAI</strong>。未配置或不可用的平台自动跳过；失败时提示并降级。
+        </p>
+      </section>
+
+      <section class="card" id="platforms">
+        <h2>平台与登录</h2>
+        <p class="note">密钥与 OAuth 令牌仅保存在本机；翻译请求只由扩展后台发出。</p>
+
+        <!-- Gemini -->
+        <div class="platform" data-platform="gemini">
+          <h3>Gemini <span class="default-model">推荐 gemini-3.8-flash</span></h3>
+          <p class="note" data-note="api"></p>
+          <p class="note" data-note="oauth"></p>
+          <div class="oauth-row">
+            <button type="button" class="secondary" data-action="oauth-login">登录 Google 账户</button>
+            <button type="button" class="secondary" data-action="oauth-logout">退出登录</button>
+            <span class="auth-status" data-auth-status>—</span>
+          </div>
+          <label>
+            Google OAuth 客户端 ID
+            <input type="text" id="google-oauth-client-id" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off" />
+          </label>
+          <p class="hint">
+            在 Google Cloud 创建「Chrome 扩展」或「桌面应用」OAuth 客户端；重定向 URI 填
+            <code id="oauth-redirect-hint">https://&lt;扩展ID&gt;.chromiumapp.org/</code>
+          </p>
+          <label>API Key（可选，与 OAuth 二选一即可）<input type="password" data-field="apiKey" autocomplete="off" /></label>
+          <label>
+            模型
+            <select data-field="modelId" disabled>
+              <option value="">请先登录或填写 Key，再刷新模型列表</option>
+            </select>
+          </label>
+          <button type="button" class="secondary" data-action="refresh-models">刷新模型列表</button>
+          <label class="check"><input type="checkbox" data-field="enabled" checked /> 启用</label>
+        </div>
+
+        <!-- Cursor -->
+        <div class="platform" data-platform="cursor">
+          <h3>Cursor <span class="default-model">实验接入</span></h3>
+          <p class="warn-box">
+            Cursor Plus 订阅<strong>不能</strong>直接在本扩展里调用模型。官方公开 API（Admin / Cloud Agents 等）也不是段落翻译用的聊天补全接口。若你有自建 OpenAI 兼容端点，可填写下方 Key + Base URL（实验）；否则请关闭本平台。
+          </p>
+          <p class="note" data-note="oauth"></p>
+          <p class="note" data-note="api"></p>
+          <label>API Key<input type="password" data-field="apiKey" autocomplete="off" /></label>
+          <label>
+            兼容 Base URL（必填才能实调用，勿填官方无文档的猜测地址）
+            <input type="text" data-field="baseUrl" placeholder="https://your-compatible-host/v1" autocomplete="off" />
+          </label>
+          <label>
+            模型
+            <select data-field="modelId" disabled>
+              <option value="">请先填写 Key（及 Base URL）后刷新</option>
+            </select>
+          </label>
+          <button type="button" class="secondary" data-action="refresh-models">刷新模型列表</button>
+          <label class="check"><input type="checkbox" data-field="enabled" checked /> 启用</label>
+        </div>
+
+        <!-- Grok -->
+        <div class="platform" data-platform="grok">
+          <h3>Grok (xAI)</h3>
+          <p class="warn-box">
+            X Premium / Grok 网页订阅<strong>通常不包含 API</strong>。须在
+            <a href="https://console.x.ai" target="_blank" rel="noreferrer">console.x.ai</a>
+            单独开通 API Key 并计费。
+          </p>
+          <p class="note" data-note="oauth"></p>
+          <p class="note" data-note="api"></p>
+          <label>API Key<input type="password" data-field="apiKey" autocomplete="off" /></label>
+          <label>
+            模型
+            <select data-field="modelId" disabled>
+              <option value="">请先填写 Key，再刷新模型列表</option>
+            </select>
+          </label>
+          <button type="button" class="secondary" data-action="refresh-models">刷新模型列表</button>
+          <label class="check"><input type="checkbox" data-field="enabled" checked /> 启用</label>
+        </div>
+
+        <!-- OpenAI -->
+        <div class="platform" data-platform="openai">
+          <h3>OpenAI <span class="default-model">推荐 gpt-4o</span></h3>
+          <p class="note" data-note="oauth"></p>
+          <p class="note" data-note="api"></p>
+          <label>API Key<input type="password" data-field="apiKey" autocomplete="off" /></label>
+          <label>
+            模型
+            <select data-field="modelId" disabled>
+              <option value="">请先填写 Key，再刷新模型列表</option>
+            </select>
+          </label>
+          <button type="button" class="secondary" data-action="refresh-models">刷新模型列表</button>
+          <label class="check"><input type="checkbox" data-field="enabled" checked /> 启用</label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>缓存</h2>
+        <label>
+          上限（MB）
+          <input type="number" id="cache-limit" min="1" max="500" step="1" />
+        </label>
+        <p id="cache-stats" class="stats">—</p>
+        <button type="button" id="clear-cache" class="secondary">清空缓存</button>
+      </section>
+
+      <section class="card">
+        <h2>用量看板</h2>
+        <p class="note">按本插件实际发出的请求统计；无硬上限、无熔断。</p>
+        <div id="usage-boards" class="boards"></div>
+        <h3>近日趋势</h3>
+        <div id="usage-daily" class="daily"></div>
+      </section>
+
+      <section class="card">
+        <h2>关于</h2>
+        <p>版本 <strong>1.0.1</strong> · Manifest V3 · 目标语言：简体中文</p>
+        <p class="note">不做 PDF / 视频 / EPUB。译文下方以脚注显示实际模型 ID。</p>
+      </section>
+
+      <div class="actions">
+        <button type="button" id="save" class="primary">保存设置</button>
+        <span id="save-status" class="status" aria-live="polite"></span>
+      </div>
+    </div>
+    <script src="./options.js"></script>
+  </body>
+</html>
