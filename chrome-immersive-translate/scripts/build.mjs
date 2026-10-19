@@ -77,8 +77,9 @@ writeFileSync(resolve(dist, "options.html"), optionsHtml);
 const manifest = {
   manifest_version: 3,
   name: "沉浸式翻译",
-  description: "网页段落双语对照 + 弹窗手动翻译（Gemini / Cursor / Grok / OpenAI）",
-  version: "1.0.1",
+  description:
+    "网页段落双语对照 + 弹窗手动翻译（本地 Ollama / Gemini / Cursor / Grok / OpenAI）",
+  version: "1.1.0",
   default_locale: "zh_CN",
   icons: {
     "16": "icons/icon16.png",
@@ -102,6 +103,8 @@ const manifest = {
   ],
   permissions: ["storage", "activeTab", "scripting", "tabs", "identity"],
   host_permissions: [
+    "http://127.0.0.1/*",
+    "http://localhost/*",
     "https://generativelanguage.googleapis.com/*",
     "https://api.x.ai/*",
     "https://api.openai.com/*",
@@ -115,3 +118,7 @@ writeFileSync(resolve(dist, "manifest.json"), JSON.stringify(manifest, null, 2))
 
 console.log("[build]", readdirSync(dist).join(", "));
 execSync("node scripts/pack.mjs", { cwd: root, stdio: "inherit" });
+execSync("ZIP_NAME=immersive-translate-local-ollama.zip node scripts/pack.mjs", {
+  cwd: root,
+  stdio: "inherit",
+});

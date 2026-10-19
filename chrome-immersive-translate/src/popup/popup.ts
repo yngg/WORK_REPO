@@ -31,6 +31,14 @@ async function main(): Promise<void> {
   const settingsResp = await sendMessage<Settings>({ type: "GET_SETTINGS" });
   if (settingsResp.ok && settingsResp.data) {
     settings = settingsResp.data;
+    // Prefer local in popup when preferLocal + local enabled
+    if (
+      settings.preferLocal !== false &&
+      settings.platforms.local?.enabled &&
+      [...platformSelect.options].some((o) => o.value === "local")
+    ) {
+      platformSelect.value = "local";
+    }
   }
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

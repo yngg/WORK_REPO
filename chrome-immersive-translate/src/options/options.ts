@@ -36,11 +36,12 @@ async function main(): Promise<void> {
   await refreshCacheStats();
   await refreshUsage();
 
-  // Auto-refresh model lists for authenticated platforms
+  // Auto-refresh model lists for authenticated / local platforms
   for (const p of PLATFORMS) {
-    const root = document.querySelector(`.platform[data-platform="${p}"]`)!;
-    const key = (root.querySelector('[data-field="apiKey"]') as HTMLInputElement).value.trim();
-    if (key || p === "gemini") {
+    const root = document.querySelector(`.platform[data-platform="${p}"]`);
+    if (!root) continue;
+    const key = (root.querySelector('[data-field="apiKey"]') as HTMLInputElement | null)?.value.trim();
+    if (p === "local" || key || p === "gemini") {
       await refreshModels(p, false);
     }
   }
@@ -64,11 +65,14 @@ async function main(): Promise<void> {
 function fillForm(settings: Settings): void {
   (document.getElementById("google-oauth-client-id") as HTMLInputElement).value =
     settings.googleOAuthClientId || "";
+  const preferLocal = document.getElementById("prefer-local") as HTMLInputElement | null;
+  if (preferLocal) preferLocal.checked = settings.preferLocal !== false;
   for (const p of PLATFORMS) {
     const root = document.querySelector(`.platform[data-platform="${p}"]`);
     if (!root) continue;
     const cfg = settings.platforms[p];
-    (root.querySelector('[data-field="apiKey"]') as HTMLInputElement).value = cfg.apiKey;
+    const apiKeyEl = root.querySelector('[data-field="apiKey"]') as HTMLInputElement | null;
+    if (apiKeyEl) apiKeyEl.value = cfg.apiKey;
     (root.querySelector('[data-field="enabled"]') as HTMLInputElement).checked = cfg.enabled;
     const baseUrl = root.querySelector('[data-field="baseUrl"]') as HTMLInputElement | null;
     if (baseUrl) baseUrl.value = cfg.baseUrl || "";
@@ -92,14 +96,16 @@ function readForm(): Settings {
   for (const p of PLATFORMS) {
     const root = document.querySelector(`.platform[data-platform="${p}"]`)!;
     const baseUrlEl = root.querySelector('[data-field="baseUrl"]') as HTMLInputElement | null;
+    const apiKeyEl = root.querySelector('[data-field="apiKey"]') as HTMLInputElement | null;
     platforms[p] = {
-      apiKey: (root.querySelector('[data-field="apiKey"]') as HTMLInputElement).value.trim(),
+      apiKey: apiKeyEl ? apiKeyEl.value.trim() : "",
       modelId: (root.querySelector('[data-field="modelId"]') as HTMLSelectElement).value.trim(),
       enabled: (root.querySelector('[data-field="enabled"]') as HTMLInputElement).checked,
       baseUrl: baseUrlEl ? baseUrlEl.value.trim() : undefined,
-      authMode: "apikey",
+      authMode: p === "local" ? "local" : "apikey",
     };
   }
+  const preferLocalEl = document.getElementById("prefer-local") as HTMLInputElement | null;
   return {
     platforms,
     cacheLimitMb: Number((document.getElementById("cache-limit") as HTMLInputElement).value) || 50,
@@ -107,6 +113,7 @@ function readForm(): Settings {
     googleOAuthClientId: (
       document.getElementById("google-oauth-client-id") as HTMLInputElement
     ).value.trim(),
+    preferLocal: preferLocalEl ? preferLocalEl.checked : true,
   };
 }
 
@@ -197,6 +204,12 @@ async function refreshAuthStatus(): Promise<void> {
     ) as HTMLElement | null;
     if (!el) continue;
     const s = resp.data[p];
+    if (p === "local") {
+      el.textContent = s.authenticated
+        ? "已配置本地 Base URL（请刷新模型列表）"
+        : "未配置本地地址";
+      continue;
+    }
     el.textContent = s.authenticated
       ? s.email
         ? `已登录：${s.email}`

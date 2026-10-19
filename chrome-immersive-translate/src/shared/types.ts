@@ -1,14 +1,17 @@
-export type Platform = "gemini" | "cursor" | "grok" | "openai";
+export type Platform = "local" | "gemini" | "cursor" | "grok" | "openai";
 
 export type TranslateMode = "webpage" | "manual" | "offline_prefetch";
 
-export type AuthMode = "apikey" | "oauth";
+export type AuthMode = "apikey" | "oauth" | "local";
 
 export interface PlatformConfig {
   apiKey: string;
   modelId: string;
   enabled: boolean;
-  /** Cursor: optional OpenAI-compatible base URL (official Cursor Plus has no public chat API). */
+  /**
+   * Cursor: OpenAI-compatible base URL.
+   * Local: Ollama (or compatible) base URL, default http://127.0.0.1:11434.
+   */
   baseUrl?: string;
   authMode?: AuthMode;
 }
@@ -26,6 +29,11 @@ export interface Settings {
   onlineTranslateDefault: boolean;
   /** Google OAuth client ID for Gemini (user-created Chrome/Desktop client). */
   googleOAuthClientId: string;
+  /**
+   * When true and local Ollama is ready, route Local → Gemini → Cursor → Grok → OpenAI.
+   * Default on so local-first users avoid cloud quota.
+   */
+  preferLocal: boolean;
 }
 
 export interface TabState {
@@ -137,11 +145,14 @@ export type MessageResponse<T = unknown> = {
 };
 
 export const DEFAULT_MODELS: Record<Platform, string> = {
+  local: "qwen2.5:7b",
   gemini: "gemini-3.8-flash",
   cursor: "cursor-fast",
   grok: "grok-2-latest",
   openai: "gpt-4o",
 };
+
+export const DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:11434";
 
 /** Retired Gemini IDs that 404 for new users — migrate on settings load. */
 export const DEPRECATED_GEMINI_MODELS = new Set([
@@ -151,10 +162,17 @@ export const DEPRECATED_GEMINI_MODELS = new Set([
   "gemini-1.5-pro",
 ]);
 
-/** No-balance routing: Gemini → Cursor → Grok → OpenAI */
-export const PLATFORM_ORDER: Platform[] = ["gemini", "cursor", "grok", "openai"];
+/**
+ * Cloud fallback order (after local when preferLocal + local ready).
+ * Full default order with preferLocal: Local → Gemini → Cursor → Grok → OpenAI.
+ */
+export const CLOUD_PLATFORM_ORDER: Platform[] = ["gemini", "cursor", "grok", "openai"];
+
+/** All platforms for settings UI / usage boards (local first). */
+export const PLATFORM_ORDER: Platform[] = ["local", ...CLOUD_PLATFORM_ORDER];
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
+  local: "本地模型 (Ollama)",
   gemini: "Gemini",
   cursor: "Cursor",
   grok: "Grok (xAI)",
@@ -163,8 +181,10 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
 
 export const TARGET_LANG = "zh-CN";
 export const DEFAULT_CACHE_MB = 50;
-/** Max parallel provider calls (page-wide). Keep low to avoid 429 stampedes. */
+/** Max parallel cloud provider calls (page-wide). Keep low to avoid 429 stampedes. */
 export const MAX_CONCURRENCY = 2;
+/** Local LLMs are usually single-GPU — keep at 1. */
+export const MAX_CONCURRENCY_LOCAL = 1;
 export const MIN_PARAGRAPH_CHARS = 20;
 
 export interface UsageSummary {

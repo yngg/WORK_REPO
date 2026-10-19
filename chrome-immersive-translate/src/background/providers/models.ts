@@ -52,6 +52,15 @@ async function fetchLiveModels(platform: Platform): Promise<ModelInfo[]> {
   const key = cfg.apiKey.trim();
 
   switch (platform) {
+    case "local": {
+      const { listOllamaModels } = await import("./ollama");
+      const base = (cfg.baseUrl || "").trim();
+      const listed = await listOllamaModels(base);
+      if (!listed.length) {
+        throw new Error("Ollama 已连接但尚未拉取模型，请先 ollama pull qwen2.5:7b");
+      }
+      return listed;
+    }
     case "gemini": {
       const oauth = await getValidGeminiAccessToken();
       if (!oauth && !key) throw new Error(authHint(platform));
@@ -124,6 +133,9 @@ async function fetchLiveModels(platform: Platform): Promise<ModelInfo[]> {
 export async function platformIsAuthenticated(platform: Platform): Promise<boolean> {
   const settings = await getSettings();
   const cfg = settings.platforms[platform];
+  if (platform === "local") {
+    return !!(cfg.baseUrl || "").trim();
+  }
   if (cfg.apiKey.trim()) return true;
   if (platform === "gemini") {
     const t = await getOAuthToken("gemini");

@@ -1,5 +1,6 @@
 import {
   DEFAULT_CACHE_MB,
+  DEFAULT_LOCAL_BASE_URL,
   DEFAULT_MODELS,
   DEPRECATED_GEMINI_MODELS,
   PLATFORM_ORDER,
@@ -21,9 +22,10 @@ export function defaultSettings(): Settings {
     platforms[p] = {
       apiKey: "",
       modelId: DEFAULT_MODELS[p],
-      enabled: true,
-      authMode: "apikey",
-      baseUrl: p === "cursor" ? "" : undefined,
+      enabled: p === "local" ? true : true,
+      authMode: p === "local" ? "local" : "apikey",
+      baseUrl:
+        p === "local" ? DEFAULT_LOCAL_BASE_URL : p === "cursor" ? "" : undefined,
     };
   }
   return {
@@ -31,6 +33,7 @@ export function defaultSettings(): Settings {
     cacheLimitMb: DEFAULT_CACHE_MB,
     onlineTranslateDefault: false,
     googleOAuthClientId: "",
+    preferLocal: true,
   };
 }
 
@@ -43,6 +46,18 @@ export async function getSettings(): Promise<Settings> {
   for (const p of PLATFORM_ORDER) {
     platforms[p] = { ...base.platforms[p], ...stored.platforms?.[p] };
   }
+  // Ensure local defaults for upgrades from cloud-only settings
+  if (!platforms.local) {
+    platforms.local = { ...base.platforms.local };
+  }
+  if (!platforms.local.baseUrl?.trim()) {
+    platforms.local.baseUrl = DEFAULT_LOCAL_BASE_URL;
+  }
+  if (!platforms.local.modelId?.trim()) {
+    platforms.local.modelId = DEFAULT_MODELS.local;
+  }
+  platforms.local.authMode = "local";
+
   // Migrate retired Gemini model IDs that 404 for new API users
   let migrated = false;
   const geminiId = (platforms.gemini.modelId || "").replace(/^models\//, "");
@@ -57,6 +72,7 @@ export async function getSettings(): Promise<Settings> {
     ...stored,
     platforms,
     googleOAuthClientId: stored.googleOAuthClientId ?? "",
+    preferLocal: stored.preferLocal ?? true,
   };
   if (migrated) {
     await chrome.storage.local.set({ [SETTINGS_KEY]: settings });

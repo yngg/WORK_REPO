@@ -6,6 +6,7 @@ import { ProviderError } from "./types";
 import { translateCursor } from "./cursor";
 import { translateGemini } from "./gemini";
 import { translateGrok } from "./grok";
+import { translateOllama } from "./ollama";
 import { translateOpenAI } from "./openai";
 import { mockTranslateToZh } from "./mock-zh";
 
@@ -48,6 +49,11 @@ export async function callProvider(
   }
 
   switch (platform) {
+    case "local": {
+      const settings = await getSettings();
+      const baseUrl = settings.platforms.local.baseUrl?.trim() || "";
+      return translateOllama({ ...args, baseUrl });
+    }
     case "gemini": {
       const accessToken = await getValidGeminiAccessToken();
       if (!accessToken && !args.apiKey.trim()) {
@@ -69,7 +75,7 @@ export async function callProvider(
   }
 }
 
-/** Whether platform can participate in routing (auth present + Cursor needs baseUrl or mock). */
+/** Whether platform can participate in routing. */
 export async function isPlatformReady(platform: Platform): Promise<boolean> {
   const settings = await getSettings();
   const cfg = settings.platforms[platform];
@@ -77,6 +83,11 @@ export async function isPlatformReady(platform: Platform): Promise<boolean> {
   const key = cfg.apiKey.trim();
   const isMock = key.toLowerCase() === "mock" || key.toLowerCase().startsWith("mock:");
 
+  if (platform === "local") {
+    if (isMock) return true;
+    // Local needs a base URL (Ollama); no API key required
+    return !!(cfg.baseUrl || "").trim() && !!(cfg.modelId || "").trim();
+  }
   if (platform === "gemini") {
     if (isMock || key) return true;
     const token = await getValidGeminiAccessToken();
