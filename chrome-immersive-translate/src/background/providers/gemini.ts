@@ -1,6 +1,12 @@
 import { DEFAULT_MODELS } from "../../shared/types";
 import type { ProviderCallArgs, ProviderCallResult } from "./types";
-import { ProviderError, TRANSLATE_SYSTEM, TRANSLATE_USER_PREFIX } from "./types";
+import {
+  ProviderError,
+  TRANSLATE_SYSTEM,
+  TRANSLATE_USER_PREFIX,
+  classifyHttpError,
+  parseRetryAfterMs,
+} from "./types";
 
 function normalizeModelId(modelId: string): string {
   return modelId.replace(/^models\//, "").trim();
@@ -30,11 +36,14 @@ async function callOnce(
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new ProviderError(
-      `Gemini 错误 ${res.status}: ${body.slice(0, 200) || res.statusText}`,
-      res.status,
-      res.status === 429 || res.status >= 500 || res.status === 402 || res.status === 404
-    );
+    const retryAfterMs = parseRetryAfterMs(res, body);
+    const classified = classifyHttpError("Gemini", res.status, body, retryAfterMs);
+    console.warn("[沉浸式翻译] Gemini HTTP", res.status, body.slice(0, 400));
+    throw new ProviderError(classified.userMessage, res.status, classified.retryable, {
+      kind: classified.kind,
+      retryAfterMs,
+      userMessage: classified.userMessage,
+    });
   }
 
   const data = (await res.json()) as {
@@ -49,7 +58,10 @@ async function callOnce(
   const translation =
     data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("")?.trim() ?? "";
   if (!translation) {
-    throw new ProviderError("Gemini 返回空译文", 502, true);
+    throw new ProviderError("Gemini 返回空译文", 502, true, {
+      kind: "other",
+      userMessage: "Gemini 返回空译文",
+    });
   }
 
   return {
@@ -76,7 +88,7 @@ export async function translateGemini(
   } catch (e) {
     const is404 =
       e instanceof ProviderError &&
-      (e.status === 404 || /no longer available|not found|404/i.test(e.message));
+      (e.status === 404 || e.kind === "not_found" || /no longer available|not found/i.test(e.message));
     const fallback = DEFAULT_MODELS.gemini;
     if (is404 && primary !== fallback) {
       return callOnce(args, fallback);

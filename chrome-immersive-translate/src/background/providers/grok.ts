@@ -1,5 +1,11 @@
 import type { ProviderCallArgs, ProviderCallResult } from "./types";
-import { ProviderError, TRANSLATE_SYSTEM, TRANSLATE_USER_PREFIX } from "./types";
+import {
+  ProviderError,
+  TRANSLATE_SYSTEM,
+  TRANSLATE_USER_PREFIX,
+  classifyHttpError,
+  parseRetryAfterMs,
+} from "./types";
 
 /** xAI Grok OpenAI-compatible chat completions API */
 export async function translateGrok(args: ProviderCallArgs): Promise<ProviderCallResult> {
@@ -25,11 +31,14 @@ export async function translateGrok(args: ProviderCallArgs): Promise<ProviderCal
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new ProviderError(
-      `Grok 错误 ${res.status}: ${body.slice(0, 200) || res.statusText}`,
-      res.status,
-      res.status === 429 || res.status >= 500 || res.status === 402
-    );
+    const retryAfterMs = parseRetryAfterMs(res, body);
+    const classified = classifyHttpError("Grok", res.status, body, retryAfterMs);
+    console.warn("[沉浸式翻译] Grok HTTP", res.status, body.slice(0, 400));
+    throw new ProviderError(classified.userMessage, res.status, classified.retryable, {
+      kind: classified.kind,
+      retryAfterMs,
+      userMessage: classified.userMessage,
+    });
   }
 
   const data = (await res.json()) as {
@@ -39,7 +48,10 @@ export async function translateGrok(args: ProviderCallArgs): Promise<ProviderCal
 
   const translation = data.choices?.[0]?.message?.content?.trim() ?? "";
   if (!translation) {
-    throw new ProviderError("Grok 返回空译文", 502, true);
+    throw new ProviderError("Grok 返回空译文", 502, true, {
+      kind: "other",
+      userMessage: "Grok 返回空译文",
+    });
   }
 
   return {

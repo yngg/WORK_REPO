@@ -22,6 +22,9 @@ let running = false;
 const pending = new Set<string>();
 const done = new Set<string>();
 let leakCheckTimer: number | null = null;
+/** After sustained 429 / stopQueue, pause enqueue until user toggles or cooldown window. */
+let queuePausedUntil = 0;
+let idlePrefetchScheduled = false;
 
 async function init(): Promise<void> {
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -65,6 +68,8 @@ async function applyFlags(next: ContentFlags): Promise<void> {
   const wasOn = flags.online || flags.offline;
   const willOn = next.online || next.offline;
   flags = next;
+  queuePausedUntil = 0;
+  idlePrefetchScheduled = false;
 
   if (!willOn) {
     cleanup();
@@ -105,7 +110,7 @@ function onScroll(): void {
   if (scrollTimer) window.clearTimeout(scrollTimer);
   scrollTimer = window.setTimeout(() => {
     void scheduleTranslate(false);
-  }, 150);
+  }, 200);
 }
 
 function cleanup(): void {
@@ -117,11 +122,21 @@ function cleanup(): void {
   if (leakCheckTimer) window.clearInterval(leakCheckTimer);
   leakCheckTimer = null;
   running = false;
+  idlePrefetchScheduled = false;
+}
+
+function isQueuePaused(): boolean {
+  return Date.now() < queuePausedUntil;
+}
+
+function pauseQueue(ms = 60_000): void {
+  queuePausedUntil = Math.max(queuePausedUntil, Date.now() + ms);
 }
 
 async function scheduleTranslate(preferViewport: boolean): Promise<void> {
   if (!flags.online && !flags.offline) return;
   if (running) return;
+  if (isQueuePaused()) return;
   running = true;
   try {
     const paragraphs = extractParagraphs();
@@ -131,13 +146,20 @@ async function scheduleTranslate(preferViewport: boolean): Promise<void> {
     const rest = paragraphs.filter((p) => !isInViewport(p.el) && !done.has(p.id));
 
     if (flags.offline) {
-      // Offline prefetch: whole-page queue (viewport first still for perceived speed)
-      targets = preferViewport ? [...visible, ...rest] : paragraphs.filter((p) => !done.has(p.id));
+      // Offline prefetch: viewport first, then rest — but only small slices to avoid stampede
+      targets = preferViewport
+        ? [...visible, ...rest.slice(0, 12)]
+        : [...visible, ...rest.slice(0, 8)].filter((p) => !done.has(p.id));
     } else {
-      targets = visible.length ? visible : rest.slice(0, 8);
-      if (rest.length && visible.length) {
+      targets = visible.length ? visible : rest.slice(0, 4);
+      // Defer off-viewport work until after viewport batch finishes (no parallel stampede)
+      if (rest.length && visible.length && !idlePrefetchScheduled) {
+        idlePrefetchScheduled = true;
         requestIdleCallbackSafe(() => {
-          void translateList(rest, "webpage", false);
+          idlePrefetchScheduled = false;
+          if (!isQueuePaused() && (flags.online || flags.offline)) {
+            void translateList(rest.slice(0, 8), "webpage", false);
+          }
         });
       }
     }
@@ -156,10 +178,26 @@ function requestIdleCallbackSafe(cb: () => void): void {
     requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
   };
   if (w.requestIdleCallback) {
-    w.requestIdleCallback(cb, { timeout: 2000 });
+    w.requestIdleCallback(cb, { timeout: 4000 });
   } else {
-    setTimeout(cb, 500);
+    setTimeout(cb, 1200);
   }
+}
+
+function toastForResult(result: TranslateResult): void {
+  if (!result.error && !result.fallbackNote) return;
+  if (result.fallbackNote) showToast(result.fallbackNote, "warn");
+  if (!result.error) return;
+
+  if (result.errorKind === "quota") {
+    showToast(result.error, "error");
+    return;
+  }
+  if (result.errorKind === "rate_limit" || result.stopQueue) {
+    showToast(result.error, "warn");
+    return;
+  }
+  showToast(result.error, "error");
 }
 
 async function translateList(
@@ -169,12 +207,19 @@ async function translateList(
 ): Promise<void> {
   const items = list.filter((p) => !pending.has(p.id) && !done.has(p.id));
   if (!items.length) return;
+  if (isQueuePaused()) return;
 
   for (const p of items) pending.add(p.id);
 
-  const chunkSize = 6;
+  // Small chunks — background concurrency is already capped at 2
+  const chunkSize = 2;
   for (let i = 0; i < items.length; i += chunkSize) {
     if (!flags.online && !flags.offline) break;
+    if (isQueuePaused()) {
+      for (let j = i; j < items.length; j++) pending.delete(items[j].id);
+      break;
+    }
+
     const chunk = items.slice(i, i + chunkSize);
     const resp = await sendMessage<Array<{ id: string; result: TranslateResult }>>({
       type: "TRANSLATE_BATCH",
@@ -200,7 +245,10 @@ async function translateList(
       continue;
     }
 
+    let sawStop = false;
     const byId = new Map(chunk.map((p) => [p.id, p]));
+    let coalescedErrorShown = false;
+
     for (const { id, result } of resp.data) {
       const p = byId.get(id);
       if (!p) continue;
@@ -217,9 +265,21 @@ async function translateList(
         insertPlaceholder(p.el, result.error || "未缓存 / 缓存不足");
         done.add(id);
       } else {
-        if (result.error) showToast(result.error, "error");
-        if (result.fallbackNote) showToast(result.fallbackNote, "warn");
+        if (result.stopQueue) sawStop = true;
+        // One toast per chunk for identical failures (render also coalesces across chunks)
+        if (result.error && !coalescedErrorShown) {
+          toastForResult(result);
+          coalescedErrorShown = true;
+        } else if (result.fallbackNote) {
+          showToast(result.fallbackNote, "warn");
+        }
       }
+    }
+
+    if (sawStop) {
+      pauseQueue(90_000);
+      for (let j = i + chunkSize; j < items.length; j++) pending.delete(items[j].id);
+      break;
     }
   }
 }
@@ -234,6 +294,7 @@ window.addEventListener("offline", () => {
 
 window.addEventListener("online", () => {
   if (flags.online || flags.offline) {
+    queuePausedUntil = 0;
     showToast("网络已恢复", "info");
     document.querySelectorAll("[data-imt-placeholder]").forEach((n) => {
       const prev = n.previousElementSibling;

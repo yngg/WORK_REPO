@@ -2,6 +2,20 @@ const ATTR_TRANS = "data-imt-translation";
 const ATTR_PLACE = "data-imt-placeholder";
 const ATTR_MODEL = "data-imt-model";
 
+/** Coalesce identical toasts: at most one visible per key within this window. */
+const TOAST_COALESCE_MS = 8000;
+
+interface ToastState {
+  message: string;
+  level: string;
+  count: number;
+  el: HTMLElement;
+  timer: number;
+  lastAt: number;
+}
+
+let activeToast: ToastState | null = null;
+
 function fillTranslationNode(
   node: HTMLElement,
   translation: string,
@@ -76,6 +90,23 @@ export function teardownAll(): void {
   });
   const toastHost = document.getElementById("imt-toast-host");
   toastHost?.remove();
+  if (activeToast?.timer) window.clearTimeout(activeToast.timer);
+  activeToast = null;
+}
+
+function toastKey(message: string, level: string): string {
+  // Normalize rate-limit / quota messages so slight wording diffs still coalesce
+  const norm = message
+    .replace(/（已尝试备用平台）/g, "")
+    .replace(/（×\d+）/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `${level}::${norm}`;
+}
+
+function formatToastText(message: string, count: number): string {
+  if (count <= 1) return message;
+  return `${message}（×${count}）`;
 }
 
 export function showToast(
@@ -89,11 +120,49 @@ export function showToast(
     host.className = "imt-toast-host";
     document.documentElement.appendChild(host);
   }
+
+  const key = toastKey(message, level);
+  const now = Date.now();
+
+  if (
+    activeToast &&
+    toastKey(activeToast.message, activeToast.level) === key &&
+    now - activeToast.lastAt < TOAST_COALESCE_MS
+  ) {
+    activeToast.count += 1;
+    activeToast.lastAt = now;
+    activeToast.el.textContent = formatToastText(activeToast.message, activeToast.count);
+    window.clearTimeout(activeToast.timer);
+    activeToast.timer = window.setTimeout(() => {
+      activeToast?.el.remove();
+      activeToast = null;
+    }, 4500);
+    return;
+  }
+
+  // Replace previous coalesce target; keep host tidy (no stack of identical errors)
+  if (activeToast) {
+    window.clearTimeout(activeToast.timer);
+    activeToast.el.remove();
+    activeToast = null;
+  }
+
   const toast = document.createElement("div");
   toast.className = `imt-toast imt-toast--${level}`;
   toast.textContent = message;
   host.appendChild(toast);
-  setTimeout(() => toast.remove(), 4500);
+
+  activeToast = {
+    message,
+    level,
+    count: 1,
+    el: toast,
+    lastAt: now,
+    timer: window.setTimeout(() => {
+      toast.remove();
+      if (activeToast?.el === toast) activeToast = null;
+    }, 4500),
+  };
 }
 
 export function countInjected(): number {

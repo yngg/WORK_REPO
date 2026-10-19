@@ -17,7 +17,11 @@ async function translateMock(
 ): Promise<ProviderCallResult> {
   const key = args.apiKey.trim().toLowerCase();
   if (key === "mock:fail" || key === "mock:429") {
-    throw new ProviderError(`${platform} 额度/限流错误 (429)`, 429, true);
+    throw new ProviderError("请求过于频繁，已降速重试", 429, true, {
+      kind: "rate_limit",
+      retryAfterMs: 2000,
+      userMessage: `${platform === "gemini" ? "Gemini" : platform} 请求过于频繁，已降速重试`,
+    });
   }
   await new Promise((r) => setTimeout(r, 40 + Math.random() * 60));
   const translation = mockTranslateToZh(args.text);

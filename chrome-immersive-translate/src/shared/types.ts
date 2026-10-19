@@ -47,6 +47,13 @@ export interface TranslateRequest {
   preferCacheOnly?: boolean;
 }
 
+export type TranslateErrorKind =
+  | "rate_limit"
+  | "quota"
+  | "auth"
+  | "not_found"
+  | "other";
+
 export interface TranslateResult {
   ok: boolean;
   translation?: string;
@@ -55,8 +62,11 @@ export interface TranslateResult {
   fromCache?: boolean;
   usage?: UsageTokens;
   error?: string;
+  errorKind?: TranslateErrorKind;
   fallbackNote?: string;
   estimated?: boolean;
+  /** Background asks content to stop enqueueing more paragraphs. */
+  stopQueue?: boolean;
 }
 
 export interface UsageTokens {
@@ -153,7 +163,8 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
 
 export const TARGET_LANG = "zh-CN";
 export const DEFAULT_CACHE_MB = 50;
-export const MAX_CONCURRENCY = 3;
+/** Max parallel provider calls (page-wide). Keep low to avoid 429 stampedes. */
+export const MAX_CONCURRENCY = 2;
 export const MIN_PARAGRAPH_CHARS = 20;
 
 export interface UsageSummary {
