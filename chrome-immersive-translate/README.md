@@ -39,7 +39,7 @@ npm run build
 
 | 平台 | 控制台 | 默认模型（可改） |
 |------|--------|------------------|
-| Gemini | [Google AI Studio](https://aistudio.google.com) | `gemini-2.5-flash` |
+| Gemini | [Google AI Studio](https://aistudio.google.com) | `gemini-3.8-flash` |
 | Grok | [xAI Console](https://console.x.ai) | `grok-2-latest` |
 | OpenAI | [platform.openai.com](https://platform.openai.com) | `gpt-4o` |
 

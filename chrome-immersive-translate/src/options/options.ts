@@ -51,6 +51,7 @@ function readForm(): Settings {
     platforms,
     cacheLimitMb: Number((document.getElementById("cache-limit") as HTMLInputElement).value) || 50,
     onlineTranslateDefault: false,
+    googleOAuthClientId: "",
   };
 }
 

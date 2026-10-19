@@ -1,6 +1,9 @@
 import {
   DEFAULT_CACHE_MB,
   DEFAULT_MODELS,
+  DEPRECATED_GEMINI_MODELS,
+  PLATFORM_ORDER,
+  type OAuthTokenState,
   type Platform,
   type Settings,
   type TabState,
@@ -10,20 +13,24 @@ import {
 const SETTINGS_KEY = "imt_settings";
 const USAGE_KEY = "imt_usage";
 const TAB_PREFIX = "imt_tab_";
+const OAUTH_PREFIX = "imt_oauth_";
 
 export function defaultSettings(): Settings {
   const platforms = {} as Settings["platforms"];
-  for (const p of Object.keys(DEFAULT_MODELS) as Platform[]) {
+  for (const p of PLATFORM_ORDER) {
     platforms[p] = {
       apiKey: "",
       modelId: DEFAULT_MODELS[p],
       enabled: true,
+      authMode: "apikey",
+      baseUrl: p === "cursor" ? "" : undefined,
     };
   }
   return {
     platforms,
     cacheLimitMb: DEFAULT_CACHE_MB,
     onlineTranslateDefault: false,
+    googleOAuthClientId: "",
   };
 }
 
@@ -32,15 +39,29 @@ export async function getSettings(): Promise<Settings> {
   const stored = raw[SETTINGS_KEY] as Partial<Settings> | undefined;
   if (!stored) return defaultSettings();
   const base = defaultSettings();
-  return {
+  const platforms = { ...base.platforms };
+  for (const p of PLATFORM_ORDER) {
+    platforms[p] = { ...base.platforms[p], ...stored.platforms?.[p] };
+  }
+  // Migrate retired Gemini model IDs that 404 for new API users
+  let migrated = false;
+  const geminiId = (platforms.gemini.modelId || "").replace(/^models\//, "");
+  if (!geminiId || DEPRECATED_GEMINI_MODELS.has(geminiId)) {
+    platforms.gemini.modelId = DEFAULT_MODELS.gemini;
+    migrated = true;
+  } else {
+    platforms.gemini.modelId = geminiId;
+  }
+  const settings: Settings = {
     ...base,
     ...stored,
-    platforms: {
-      gemini: { ...base.platforms.gemini, ...stored.platforms?.gemini },
-      grok: { ...base.platforms.grok, ...stored.platforms?.grok },
-      openai: { ...base.platforms.openai, ...stored.platforms?.openai },
-    },
+    platforms,
+    googleOAuthClientId: stored.googleOAuthClientId ?? "",
   };
+  if (migrated) {
+    await chrome.storage.local.set({ [SETTINGS_KEY]: settings });
+  }
+  return settings;
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {
@@ -85,11 +106,28 @@ export async function getUsageRecords(): Promise<UsageRecord[]> {
 export async function appendUsage(record: UsageRecord): Promise<void> {
   const list = await getUsageRecords();
   list.push(record);
-  // Keep last ~5000 records
   const trimmed = list.length > 5000 ? list.slice(list.length - 5000) : list;
   await chrome.storage.local.set({ [USAGE_KEY]: trimmed });
 }
 
 export async function clearUsage(): Promise<void> {
   await chrome.storage.local.set({ [USAGE_KEY]: [] });
+}
+
+export async function getOAuthToken(platform: Platform): Promise<OAuthTokenState | null> {
+  const key = OAUTH_PREFIX + platform;
+  const raw = await chrome.storage.local.get(key);
+  return (raw[key] as OAuthTokenState | undefined) ?? null;
+}
+
+export async function setOAuthToken(
+  platform: Platform,
+  token: OAuthTokenState | null
+): Promise<void> {
+  const key = OAUTH_PREFIX + platform;
+  if (!token) {
+    await chrome.storage.local.remove(key);
+  } else {
+    await chrome.storage.local.set({ [key]: token });
+  }
 }

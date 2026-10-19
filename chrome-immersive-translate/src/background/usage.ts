@@ -70,6 +70,7 @@ export async function summarizeUsage(days = 14): Promise<UsageSummary> {
 
   const byPlatform = {
     gemini: emptyPlat(),
+    cursor: emptyPlat(),
     grok: emptyPlat(),
     openai: emptyPlat(),
   } as UsageSummary["byPlatform"];

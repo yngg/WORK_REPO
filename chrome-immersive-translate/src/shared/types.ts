@@ -1,18 +1,31 @@
-export type Platform = "gemini" | "grok" | "openai";
+export type Platform = "gemini" | "cursor" | "grok" | "openai";
 
 export type TranslateMode = "webpage" | "manual" | "offline_prefetch";
+
+export type AuthMode = "apikey" | "oauth";
 
 export interface PlatformConfig {
   apiKey: string;
   modelId: string;
   enabled: boolean;
+  /** Cursor: optional OpenAI-compatible base URL (official Cursor Plus has no public chat API). */
+  baseUrl?: string;
+  authMode?: AuthMode;
+}
+
+export interface OAuthTokenState {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: number;
+  email?: string;
 }
 
 export interface Settings {
   platforms: Record<Platform, PlatformConfig>;
   cacheLimitMb: number;
-  /** Global default for online translate — pages start OFF unless tab override */
   onlineTranslateDefault: boolean;
+  /** Google OAuth client ID for Gemini (user-created Chrome/Desktop client). */
+  googleOAuthClientId: string;
 }
 
 export interface TabState {
@@ -28,11 +41,9 @@ export interface TabState {
 export interface TranslateRequest {
   text: string;
   mode: TranslateMode;
-  /** Force a platform (manual popup); otherwise use routing */
   preferredPlatform?: Platform;
   sourceLang?: string;
   targetLang?: string;
-  /** Offline: only return cache hits, never call APIs */
   preferCacheOnly?: boolean;
 }
 
@@ -84,6 +95,12 @@ export interface ParagraphPayload {
   preferCacheOnly?: boolean;
 }
 
+export interface ModelInfo {
+  id: string;
+  displayName: string;
+  recommended?: boolean;
+}
+
 export type MessageType =
   | { type: "TRANSLATE"; payload: TranslateRequest }
   | { type: "TRANSLATE_BATCH"; payload: { items: ParagraphPayload[]; mode: TranslateMode } }
@@ -97,7 +114,11 @@ export type MessageType =
   | { type: "GET_CACHE_STATS" }
   | { type: "PING" }
   | { type: "TOAST"; payload: { message: string; level?: "info" | "error" | "warn" } }
-  | { type: "CONTENT_STATUS"; payload: { online: boolean; offline: boolean } };
+  | { type: "CONTENT_STATUS"; payload: { online: boolean; offline: boolean } }
+  | { type: "LIST_MODELS"; payload: { platform: Platform } }
+  | { type: "OAUTH_LOGIN"; payload: { platform: Platform } }
+  | { type: "OAUTH_LOGOUT"; payload: { platform: Platform } }
+  | { type: "GET_AUTH_STATUS" };
 
 export type MessageResponse<T = unknown> = {
   ok: boolean;
@@ -106,15 +127,26 @@ export type MessageResponse<T = unknown> = {
 };
 
 export const DEFAULT_MODELS: Record<Platform, string> = {
-  gemini: "gemini-2.5-flash",
+  gemini: "gemini-3.8-flash",
+  cursor: "cursor-fast",
   grok: "grok-2-latest",
   openai: "gpt-4o",
 };
 
-export const PLATFORM_ORDER: Platform[] = ["gemini", "grok", "openai"];
+/** Retired Gemini IDs that 404 for new users — migrate on settings load. */
+export const DEPRECATED_GEMINI_MODELS = new Set([
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
+]);
+
+/** No-balance routing: Gemini → Cursor → Grok → OpenAI */
+export const PLATFORM_ORDER: Platform[] = ["gemini", "cursor", "grok", "openai"];
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   gemini: "Gemini",
+  cursor: "Cursor",
   grok: "Grok (xAI)",
   openai: "OpenAI",
 };

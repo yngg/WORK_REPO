@@ -1,14 +1,26 @@
+import { DEFAULT_MODELS } from "../../shared/types";
 import type { ProviderCallArgs, ProviderCallResult } from "./types";
 import { ProviderError, TRANSLATE_SYSTEM, TRANSLATE_USER_PREFIX } from "./types";
 
-export async function translateGemini(args: ProviderCallArgs): Promise<ProviderCallResult> {
-  const { apiKey, modelId, text, signal } = args;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+function normalizeModelId(modelId: string): string {
+  return modelId.replace(/^models\//, "").trim();
+}
+
+async function callOnce(
+  args: ProviderCallArgs & { accessToken?: string },
+  modelId: string
+): Promise<ProviderCallResult> {
+  const { apiKey, text, signal, accessToken } = args;
+  const id = normalizeModelId(modelId);
+  const base = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(id)}:generateContent`;
+  const url = accessToken ? base : `${base}?key=${encodeURIComponent(apiKey)}`;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   const res = await fetch(url, {
     method: "POST",
     signal,
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: TRANSLATE_SYSTEM }] },
       contents: [{ role: "user", parts: [{ text: TRANSLATE_USER_PREFIX + text }] }],
@@ -21,7 +33,7 @@ export async function translateGemini(args: ProviderCallArgs): Promise<ProviderC
     throw new ProviderError(
       `Gemini 错误 ${res.status}: ${body.slice(0, 200) || res.statusText}`,
       res.status,
-      res.status === 429 || res.status >= 500 || res.status === 402
+      res.status === 429 || res.status >= 500 || res.status === 402 || res.status === 404
     );
   }
 
@@ -42,7 +54,7 @@ export async function translateGemini(args: ProviderCallArgs): Promise<ProviderC
 
   return {
     translation,
-    modelId,
+    modelId: id,
     platform: "gemini",
     usage: data.usageMetadata
       ? {
@@ -53,4 +65,22 @@ export async function translateGemini(args: ProviderCallArgs): Promise<ProviderC
         }
       : undefined,
   };
+}
+
+export async function translateGemini(
+  args: ProviderCallArgs & { accessToken?: string }
+): Promise<ProviderCallResult> {
+  const primary = normalizeModelId(args.modelId) || DEFAULT_MODELS.gemini;
+  try {
+    return await callOnce(args, primary);
+  } catch (e) {
+    const is404 =
+      e instanceof ProviderError &&
+      (e.status === 404 || /no longer available|not found|404/i.test(e.message));
+    const fallback = DEFAULT_MODELS.gemini;
+    if (is404 && primary !== fallback) {
+      return callOnce(args, fallback);
+    }
+    throw e;
+  }
 }
