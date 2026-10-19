@@ -88,7 +88,7 @@ async function main() {
     type: "SAVE_SETTINGS",
     payload: {
       platforms: {
-        gemini: { apiKey: "mock", modelId: "gemini-2.5-flash", enabled: true },
+        gemini: { apiKey: "mock", modelId: "gemini-3.8-flash", enabled: true },
         grok: { apiKey: "mock", modelId: "grok-2-latest", enabled: true },
         openai: { apiKey: "", modelId: "gpt-4o", enabled: true },
       },
@@ -182,7 +182,7 @@ async function main() {
     "F5",
     !!(
       manual?.ok &&
-      manual?.data?.modelId === "gemini-2.5-flash" &&
+      manual?.data?.modelId === "gemini-3.8-flash" &&
       manual?.data?.translation &&
       manualZh &&
       manualNoLabel
@@ -194,7 +194,7 @@ async function main() {
     type: "SAVE_SETTINGS",
     payload: {
       platforms: {
-        gemini: { apiKey: "mock:429", modelId: "gemini-2.5-flash", enabled: true },
+        gemini: { apiKey: "mock:429", modelId: "gemini-3.8-flash", enabled: true },
         grok: { apiKey: "mock", modelId: "grok-2-latest", enabled: true },
         openai: { apiKey: "", modelId: "gpt-4o", enabled: true },
       },
@@ -230,7 +230,7 @@ async function main() {
     type: "SAVE_SETTINGS",
     payload: {
       platforms: {
-        gemini: { apiKey: "mock", modelId: "gemini-2.5-flash", enabled: true },
+        gemini: { apiKey: "mock", modelId: "gemini-3.8-flash", enabled: true },
         grok: { apiKey: "", modelId: "grok-2-latest", enabled: true },
         openai: { apiKey: "", modelId: "gpt-4o", enabled: true },
       },

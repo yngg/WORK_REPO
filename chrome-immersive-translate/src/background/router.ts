@@ -1,5 +1,6 @@
 import { getSettings } from "../shared/storage";
 import {
+  PLATFORM_LABELS,
   PLATFORM_ORDER,
   TARGET_LANG,
   type Platform,
@@ -8,7 +9,7 @@ import {
   type TranslateResult,
 } from "../shared/types";
 import { getCached, getCachedAny, putCache } from "./cache";
-import { callProvider, ProviderError } from "./providers";
+import { callProvider, isPlatformReady, ProviderError } from "./providers";
 import { recordFailure, recordSuccess } from "./usage";
 
 const inflight = new Map<string, Promise<TranslateResult>>();
@@ -31,17 +32,15 @@ function releaseSlot(): void {
   if (next) next();
 }
 
-function configuredPlatforms(
-  settings: Awaited<ReturnType<typeof getSettings>>,
-  preferred?: Platform
-): Platform[] {
+async function configuredPlatforms(preferred?: Platform): Promise<Platform[]> {
   const all = preferred
     ? [preferred, ...PLATFORM_ORDER.filter((p) => p !== preferred)]
     : [...PLATFORM_ORDER];
-  return all.filter((p) => {
-    const cfg = settings.platforms[p];
-    return cfg.enabled && !!cfg.apiKey.trim();
-  });
+  const ready: Platform[] = [];
+  for (const p of all) {
+    if (await isPlatformReady(p)) ready.push(p);
+  }
+  return ready;
 }
 
 export async function translateText(
@@ -49,24 +48,23 @@ export async function translateText(
   signal?: AbortSignal
 ): Promise<TranslateResult> {
   const settings = await getSettings();
-  const platforms = configuredPlatforms(settings, req.preferredPlatform);
+  const platforms = await configuredPlatforms(req.preferredPlatform);
 
   if (platforms.length === 0) {
     return {
       ok: false,
-      error: "未配置任何 API Key。请在设置页填写 Gemini / Grok / OpenAI 密钥。",
+      error:
+        "未配置可用平台。请填写 API Key（Gemini 也可 OAuth）；Cursor 还需兼容 Base URL（官方无第三方聊天 API）。",
     };
   }
 
   const modelIds = platforms.map((p) => settings.platforms[p].modelId);
   const cacheKeyHint = `${req.text.slice(0, 80)}|${modelIds.join(",")}`;
 
-  // Deduplicate identical in-flight requests
   const existing = inflight.get(cacheKeyHint);
   if (existing) return existing;
 
   const task = (async (): Promise<TranslateResult> => {
-    // Cache hit on any candidate model — zero token use
     const cached = await getCachedAny(req.text, modelIds);
     if (cached) {
       return {
@@ -78,13 +76,8 @@ export async function translateText(
       };
     }
 
-    // Offline / cache-only mode: do not call APIs
     if (req.preferCacheOnly) {
-      return {
-        ok: false,
-        error: "未缓存 / 缓存不足",
-        fromCache: false,
-      };
+      return { ok: false, error: "未缓存 / 缓存不足", fromCache: false };
     }
 
     await acquireSlot();
@@ -94,13 +87,10 @@ export async function translateText(
       let previousLabel: string | undefined;
 
       for (const platform of platforms) {
-        if (signal?.aborted) {
-          return { ok: false, error: "已取消" };
-        }
+        if (signal?.aborted) return { ok: false, error: "已取消" };
         const cfg = settings.platforms[platform];
         const modelId = cfg.modelId;
 
-        // Per-model cache check
         const hit = await getCached(req.text, modelId);
         if (hit) {
           return {
@@ -139,7 +129,7 @@ export async function translateText(
           });
 
           if (previousLabel) {
-            fallbackNote = `已从 ${previousLabel} 切换到 ${platformLabel(platform)}，模型 ${result.modelId}`;
+            fallbackNote = `已从 ${previousLabel} 切换到 ${PLATFORM_LABELS[platform]}，模型 ${result.modelId}`;
           }
 
           return {
@@ -166,8 +156,7 @@ export async function translateText(
             mode: req.mode,
             error: msg,
           });
-          previousLabel = `${platformLabel(platform)}（${modelId}）`;
-          // Continue to next platform
+          previousLabel = `${PLATFORM_LABELS[platform]}（${modelId}）`;
         }
       }
 
@@ -212,8 +201,4 @@ export async function translateBatch(
   });
   await Promise.all(workers);
   return out;
-}
-
-function platformLabel(p: Platform): string {
-  return p === "gemini" ? "Gemini" : p === "grok" ? "Grok" : "OpenAI";
 }

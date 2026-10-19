@@ -1,13 +1,16 @@
 import { clearCache, getCacheStats, setCacheLimitMb } from "./cache";
 import { translateBatch, translateText } from "./router";
 import { summarizeUsage } from "./usage";
+import { listModels, platformIsAuthenticated } from "./providers/models";
+import { loginGoogleGemini, logoutGoogleGemini } from "./auth/google-oauth";
 import {
+  getOAuthToken,
   getSettings,
   getTabState,
   saveSettings,
   setTabState,
 } from "../shared/storage";
-import type { MessageType, Settings, TabState } from "../shared/types";
+import { PLATFORM_ORDER, type MessageType, type Platform, type Settings, type TabState } from "../shared/types";
 
 const abortControllers = new Map<number, AbortController>();
 
@@ -26,7 +29,7 @@ chrome.runtime.onMessage.addListener((message: MessageType, sender, sendResponse
     .catch((e) =>
       sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) })
     );
-  return true; // async
+  return true;
 });
 
 async function handleMessage(
@@ -37,10 +40,8 @@ async function handleMessage(
     case "PING":
       return { ok: true, data: { version: "1.0.0" } };
 
-    case "GET_SETTINGS": {
-      const settings = await getSettings();
-      return { ok: true, data: settings };
-    }
+    case "GET_SETTINGS":
+      return { ok: true, data: await getSettings() };
 
     case "SAVE_SETTINGS": {
       const settings = message.payload as Settings;
@@ -49,30 +50,23 @@ async function handleMessage(
       return { ok: true, data: settings };
     }
 
-    case "GET_TAB_STATE": {
-      const state = await getTabState(message.payload.tabId);
-      return { ok: true, data: state };
-    }
+    case "GET_TAB_STATE":
+      return { ok: true, data: await getTabState(message.payload.tabId) };
 
     case "GET_MY_TAB_STATE": {
       const tabId = sender.tab?.id;
       if (tabId == null) return { ok: false, error: "无标签页上下文" };
-      const state = await getTabState(tabId);
-      return { ok: true, data: state };
+      return { ok: true, data: await getTabState(tabId) };
     }
 
     case "SET_TAB_STATE": {
       const prev = await getTabState(message.payload.tabId);
       const next: TabState = { ...prev, ...message.payload };
       await setTabState(next);
-
-      // Abort in-flight when disabling online/offline
       if (!next.onlineEnabled && !next.offlinePrefetchEnabled) {
         abortControllers.get(next.tabId)?.abort();
         abortControllers.delete(next.tabId);
       }
-
-      // Notify content script
       try {
         await chrome.tabs.sendMessage(next.tabId, {
           type: "CONTENT_STATUS",
@@ -82,7 +76,7 @@ async function handleMessage(
           },
         });
       } catch {
-        /* tab may not have content script */
+        /* ignore */
       }
       return { ok: true, data: next };
     }
@@ -97,18 +91,15 @@ async function handleMessage(
         signal = abortControllers.get(tabId)!.signal;
       }
       const result = await translateText(message.payload, signal);
-      if (tabId != null && result.ok) {
+      if (tabId != null) {
         const state = await getTabState(tabId);
         await setTabState({
           ...state,
           lastModelId: result.modelId,
           lastPlatform: result.platform,
           lastFallbackNote: result.fallbackNote,
-          lastError: undefined,
+          lastError: result.ok ? undefined : result.error,
         });
-      } else if (tabId != null && !result.ok) {
-        const state = await getTabState(tabId);
-        await setTabState({ ...state, lastError: result.error });
       }
       return { ok: result.ok, data: result, error: result.error };
     }
@@ -120,26 +111,75 @@ async function handleMessage(
         controller = new AbortController();
         abortControllers.set(tabId, controller);
       }
-      const results = await translateBatch(
-        message.payload.items,
-        message.payload.mode,
-        controller?.signal
-      );
-      return { ok: true, data: results };
+      return {
+        ok: true,
+        data: await translateBatch(
+          message.payload.items,
+          message.payload.mode,
+          controller?.signal
+        ),
+      };
     }
 
-    case "GET_USAGE": {
-      const summary = await summarizeUsage(message.payload?.days ?? 14);
-      return { ok: true, data: summary };
-    }
+    case "GET_USAGE":
+      return { ok: true, data: await summarizeUsage(message.payload?.days ?? 14) };
 
-    case "CLEAR_CACHE": {
+    case "CLEAR_CACHE":
       await clearCache();
       return { ok: true, data: await getCacheStats() };
+
+    case "GET_CACHE_STATS":
+      return { ok: true, data: await getCacheStats() };
+
+    case "LIST_MODELS": {
+      const listed = await listModels(message.payload.platform);
+      if (listed.fellBackFrom || listed.selectedId) {
+        const settings = await getSettings();
+        const p = message.payload.platform;
+        if (settings.platforms[p].modelId !== listed.selectedId) {
+          settings.platforms[p].modelId = listed.selectedId;
+          await saveSettings(settings);
+        }
+      }
+      return { ok: true, data: listed };
     }
 
-    case "GET_CACHE_STATS": {
-      return { ok: true, data: await getCacheStats() };
+    case "OAUTH_LOGIN": {
+      if (message.payload.platform !== "gemini") {
+        return { ok: false, error: "该平台不支持 OAuth 登录" };
+      }
+      const result = await loginGoogleGemini();
+      const settings = await getSettings();
+      settings.platforms.gemini.authMode = "oauth";
+      await saveSettings(settings);
+      return { ok: true, data: result };
+    }
+
+    case "OAUTH_LOGOUT": {
+      if (message.payload.platform === "gemini") {
+        await logoutGoogleGemini();
+        const settings = await getSettings();
+        settings.platforms.gemini.authMode = "apikey";
+        await saveSettings(settings);
+      }
+      return { ok: true };
+    }
+
+    case "GET_AUTH_STATUS": {
+      const status: Record<
+        Platform,
+        { authenticated: boolean; email?: string; mode: string }
+      > = {} as never;
+      for (const p of PLATFORM_ORDER) {
+        const authenticated = await platformIsAuthenticated(p);
+        const oauth = p === "gemini" ? await getOAuthToken("gemini") : null;
+        status[p] = {
+          authenticated,
+          email: oauth?.email,
+          mode: oauth?.accessToken ? "oauth" : "apikey",
+        };
+      }
+      return { ok: true, data: status };
     }
 
     default:

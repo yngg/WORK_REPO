@@ -1,13 +1,13 @@
 # 沉浸式翻译（Chrome MV3）v1
 
-网页段落**双语对照**（原文下方显示中文译文）+ 工具栏**弹窗手动翻译**。支持自有 Gemini / Grok / OpenAI API Key。
+网页段落**双语对照**（原文下方显示中文译文）+ 工具栏**弹窗手动翻译**。支持 Gemini / Cursor（实验）/ Grok / OpenAI；密钥或 OAuth 仅存本机。
 
 ## 功能概览
 
 - 本页在线翻译（默认关闭，显式开启才请求）
 - 本页离线预译 + 断网缓存/占位
 - 弹窗手动翻译（默认 Gemini，可切换平台；始终展示所用模型 ID）
-- 失败自动降级：Gemini → Grok → OpenAI
+- 失败自动降级：Gemini → Cursor → Grok → OpenAI
 - 本机段落缓存（默认 50MB，LRU）
 - 用量看板（按平台/模型统计）
 

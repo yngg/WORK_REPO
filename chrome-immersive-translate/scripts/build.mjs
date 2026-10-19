@@ -77,8 +77,8 @@ writeFileSync(resolve(dist, "options.html"), optionsHtml);
 const manifest = {
   manifest_version: 3,
   name: "沉浸式翻译",
-  description: "网页段落双语对照 + 弹窗手动翻译（Gemini / Grok / OpenAI）",
-  version: "1.0.0",
+  description: "网页段落双语对照 + 弹窗手动翻译（Gemini / Cursor / Grok / OpenAI）",
+  version: "1.0.1",
   default_locale: "zh_CN",
   icons: {
     "16": "icons/icon16.png",
@@ -100,11 +100,15 @@ const manifest = {
       run_at: "document_idle",
     },
   ],
-  permissions: ["storage", "activeTab", "scripting", "tabs"],
+  permissions: ["storage", "activeTab", "scripting", "tabs", "identity"],
   host_permissions: [
     "https://generativelanguage.googleapis.com/*",
     "https://api.x.ai/*",
     "https://api.openai.com/*",
+    "https://api.cursor.com/*",
+    "https://accounts.google.com/*",
+    "https://oauth2.googleapis.com/*",
+    "https://www.googleapis.com/*",
   ],
 };
 writeFileSync(resolve(dist, "manifest.json"), JSON.stringify(manifest, null, 2));

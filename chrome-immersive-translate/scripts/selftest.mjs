@@ -236,7 +236,7 @@ async function main() {
     await swEval(async () => {
       const settings = {
         platforms: {
-          gemini: { apiKey: "mock", modelId: "gemini-2.5-flash", enabled: true },
+          gemini: { apiKey: "mock", modelId: "gemini-3.8-flash", enabled: true },
           grok: { apiKey: "mock", modelId: "grok-2-latest", enabled: true },
           openai: { apiKey: "", modelId: "gpt-4o", enabled: true },
         },
@@ -333,7 +333,7 @@ async function main() {
     });
     record(
       "F5",
-      !!(manual?.ok && manual?.data?.translation && manual?.data?.modelId === "gemini-2.5-flash"),
+      !!(manual?.ok && manual?.data?.translation && manual?.data?.modelId === "gemini-3.8-flash"),
       `model=${manual?.data?.modelId}`
     );
 
@@ -341,7 +341,7 @@ async function main() {
       await chrome.storage.local.set({
         imt_settings: {
           platforms: {
-            gemini: { apiKey: "mock:429", modelId: "gemini-2.5-flash", enabled: true },
+            gemini: { apiKey: "mock:429", modelId: "gemini-3.8-flash", enabled: true },
             grok: { apiKey: "mock", modelId: "grok-2-latest", enabled: true },
             openai: { apiKey: "", modelId: "gpt-4o", enabled: true },
           },
@@ -392,7 +392,7 @@ async function main() {
       await chrome.storage.local.set({
         imt_settings: {
           platforms: {
-            gemini: { apiKey: "mock", modelId: "gemini-2.5-flash", enabled: true },
+            gemini: { apiKey: "mock", modelId: "gemini-3.8-flash", enabled: true },
             grok: { apiKey: "", modelId: "grok-2-latest", enabled: true },
             openai: { apiKey: "", modelId: "gpt-4o", enabled: true },
           },

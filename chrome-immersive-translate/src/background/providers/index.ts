@@ -1,6 +1,9 @@
+import { getSettings } from "../../shared/storage";
 import type { Platform } from "../../shared/types";
+import { getValidGeminiAccessToken } from "../auth/google-oauth";
 import type { ProviderCallArgs, ProviderCallResult } from "./types";
 import { ProviderError } from "./types";
+import { translateCursor } from "./cursor";
 import { translateGemini } from "./gemini";
 import { translateGrok } from "./grok";
 import { translateOpenAI } from "./openai";
@@ -8,7 +11,6 @@ import { mockTranslateToZh } from "./mock-zh";
 
 export { ProviderError } from "./types";
 
-/** Set API Key to `mock` (or `mock:fail`) in settings for local self-test without real credentials. */
 async function translateMock(
   platform: Platform,
   args: ProviderCallArgs
@@ -40,9 +42,20 @@ export async function callProvider(
   if (key === "mock" || key.startsWith("mock:")) {
     return translateMock(platform, args);
   }
+
   switch (platform) {
-    case "gemini":
-      return translateGemini(args);
+    case "gemini": {
+      const accessToken = await getValidGeminiAccessToken();
+      if (!accessToken && !args.apiKey.trim()) {
+        throw new ProviderError("Gemini 未配置 API Key 或 OAuth", 401, false);
+      }
+      return translateGemini({ ...args, accessToken: accessToken ?? undefined });
+    }
+    case "cursor": {
+      const settings = await getSettings();
+      const baseUrl = settings.platforms.cursor.baseUrl?.trim() || "";
+      return translateCursor({ ...args, baseUrl });
+    }
     case "grok":
       return translateGrok(args);
     case "openai":
@@ -50,4 +63,24 @@ export async function callProvider(
     default:
       throw new Error(`未知平台: ${platform}`);
   }
+}
+
+/** Whether platform can participate in routing (auth present + Cursor needs baseUrl or mock). */
+export async function isPlatformReady(platform: Platform): Promise<boolean> {
+  const settings = await getSettings();
+  const cfg = settings.platforms[platform];
+  if (!cfg.enabled) return false;
+  const key = cfg.apiKey.trim();
+  const isMock = key.toLowerCase() === "mock" || key.toLowerCase().startsWith("mock:");
+
+  if (platform === "gemini") {
+    if (isMock || key) return true;
+    const token = await getValidGeminiAccessToken();
+    return !!token;
+  }
+  if (platform === "cursor") {
+    if (isMock) return true;
+    return !!key && !!(cfg.baseUrl || "").trim();
+  }
+  return !!key;
 }
